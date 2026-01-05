@@ -16,108 +16,58 @@ export const persianMonths = [
   'اسفند',
 ];
 
-// Persian day names (abbreviated - first letter)
-// Saturday=0, Sunday=1, Monday=2, Tuesday=3, Wednesday=4, Thursday=5, Friday=6
+// Persian weekday first letters (Saturday -> Friday)
 export const persianDays = ['ش', 'ی', 'د', 'س', 'چ', 'پ', 'ج'];
 
-/**
- * Get Persian weekday first letter from JavaScript date
- * @param {Date} date - JavaScript Date object
- * @returns {string} Persian weekday letter (ش, ی, د, س, چ, پ, ج)
- */
 export function getPersianWeekdayLetter(date) {
-  const jsDay = date.getDay(); // 0=Sunday, 1=Monday, ..., 6=Saturday
-  // Map JS weekday to Persian weekday
-  // JS: 0=Sun, 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri, 6=Sat
-  // Per: 0=Sat(ش), 1=Sun(ی), 2=Mon(د), 3=Tue(س), 4=Wed(چ), 5=Thu(پ), 6=Fri(ج)
-  // Formula: Saturday (6) -> 0, others -> jsDay + 1
-  const persianDayIndex = jsDay === 6 ? 0 : jsDay + 1;
-  return persianDays[persianDayIndex];
+  const d = new Date(date);
+  const jsDay = d.getDay(); // 0=Sunday .. 6=Saturday
+  const persianIndex = jsDay === 6 ? 0 : jsDay + 1;
+  return persianDays[persianIndex] || '';
 }
 
-/**
- * Convert Gregorian date to Jalali and format
- * @param {Date} date - JavaScript Date object
- * @param {string} format - Format string (%F %Y, %j, %M %j)
- * @returns {string} Formatted Jalali date string
- */
 export function formatJalaliDate(date, format) {
-  const gregorianDate = new Date(date);
-  const jalali = toJalaali(
-    gregorianDate.getFullYear(),
-    gregorianDate.getMonth() + 1,
-    gregorianDate.getDate()
-  );
+  const g = new Date(date);
+  const j = toJalaali(g.getFullYear(), g.getMonth() + 1, g.getDate());
 
-  // Format: %F %Y -> Month Name Year (e.g., "فروردین 1405")
   if (format === '%F %Y') {
-    return `${persianMonths[jalali.jm - 1]} ${jalali.jy}`;
+    return `${persianMonths[j.jm - 1]} ${j.jy}`;
   }
-
-  // Format: %j -> Day number with weekday letter (e.g., "ش 15")
   if (format === '%j') {
-    const weekdayLetter = getPersianWeekdayLetter(gregorianDate);
-    return `${weekdayLetter} ${jalali.jd}`;
+    return `${getPersianWeekdayLetter(g)} ${j.jd}`;
+  }
+  if (format === '%Y/%m/%d') {
+    const mm = String(j.jm).padStart(2, '0');
+    const dd = String(j.jd).padStart(2, '0');
+    return `${j.jy}/${mm}/${dd}`;
   }
 
-  // Format: %M %j -> Month Day (e.g., "فروردین 15")
-  if (format === '%M %j') {
-    return `${persianMonths[jalali.jm - 1]} ${jalali.jd}`;
-  }
-
-  // Default: return day number with weekday letter
-  const weekdayLetter = getPersianWeekdayLetter(gregorianDate);
-  return `${weekdayLetter} ${jalali.jd}`;
+  return `${getPersianWeekdayLetter(g)} ${j.jd}`;
 }
 
-/**
- * Format Jalali date for columns (e.g., "1405/01/15")
- * @param {Date} date - JavaScript Date object
- * @returns {string} Formatted Jalali date string (YYYY/MM/DD)
- */
-export function formatJalaliDateColumn(date) {
-  const gregorianDate = new Date(date);
-  const jalali = toJalaali(
-    gregorianDate.getFullYear(),
-    gregorianDate.getMonth() + 1,
-    gregorianDate.getDate()
-  );
-  return `${jalali.jy}/${String(jalali.jm).padStart(2, '0')}/${String(jalali.jd).padStart(2, '0')}`;
+// Used by grid columns which pass value (often Date/string)
+export function formatJalaliDateColumn(value) {
+  if (!value) return '';
+  const d = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(d.getTime())) return '';
+  return formatJalaliDate(d, '%Y/%m/%d');
 }
 
-/**
- * Create Jalali scales configuration for Gantt chart
- * @returns {Array} Scales array with Jalali formatting
- */
 export function createJalaliScales() {
   return [
-    {
-      unit: 'month',
-      step: 1,
-      format: (date) => formatJalaliDate(date, '%F %Y'),
-    },
-    {
-      unit: 'day',
-      step: 1,
-      format: (date) => formatJalaliDate(date, '%j'),
-    },
+    { unit: 'month', step: 1, format: (date) => formatJalaliDate(date, '%F %Y') },
+    { unit: 'day', step: 1, format: (date) => formatJalaliDate(date, '%j') },
   ];
 }
 
-/**
- * Create highlightTime function for Thursday and Friday columns
- * @returns {Function} highlightTime function
- */
 export function createJalaliHighlightTime() {
   return (date, unit) => {
     if (unit === 'day') {
-      const weekdayLetter = getPersianWeekdayLetter(date);
-      // Thursday = پ, Friday = ج
-      if (weekdayLetter === 'پ' || weekdayLetter === 'ج') {
-        return 'wx-thursday-friday';
-      }
+      const letter = getPersianWeekdayLetter(date);
+      if (letter === 'پ' || letter === 'ج') return 'wx-thursday-friday';
     }
     return '';
   };
 }
+
 

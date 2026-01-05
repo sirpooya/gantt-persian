@@ -634,6 +634,7 @@ function Bars(props) {
                 style={taskStyle(task)}
                 data-tooltip-id={task.id}
                 data-id={task.id}
+                data-category-id={task.categoryId || ''}
                 tabIndex={focused === task.id ? 0 : -1}
               >
                 {!readonly ? (

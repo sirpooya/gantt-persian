@@ -10,7 +10,11 @@
       "parent": 0,
       "type": "task",
       "details": "",
-      "assigneeId": "3",
+      "assigneeIds": [
+        "3",
+        "5"
+      ],
+      "categoryId": "1",
       "unscheduled": false
     }
   ],

@@ -1,0 +1,9 @@
+[
+  { "id": "1", "name": "Design", "color": "#7C4DFF" },
+  { "id": "2", "name": "Backend", "color": "#1E88E5" },
+  { "id": "3", "name": "Frontend", "color": "#00ACC1" },
+  { "id": "4", "name": "QA", "color": "#43A047" },
+  { "id": "5", "name": "Blocked", "color": "#E53935" }
+]
+
+

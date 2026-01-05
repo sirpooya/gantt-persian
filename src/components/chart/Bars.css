@@ -161,11 +161,11 @@
 }
 
 .wx-task .wx-progress-percent.wx-GKbcLEGA {
-  background-color: var(--wx-gantt-task-fill-color);
+  background-color: rgba(0, 0, 0, 0.3) !important;
 }
 
 .wx-summary .wx-progress-percent.wx-GKbcLEGA {
-  background-color: var(--wx-gantt-summary-fill-color);
+  background-color: rgba(0, 0, 0, 0.3) !important;
 }
 
 .wx-link.wx-GKbcLEGA {
@@ -260,7 +260,7 @@
   border: 1px solid var(--wx-gantt-task-critical-color);
 }
 .wx-task.wx-critical .wx-progress-percent {
-  background-color: var(--wx-gantt-task-critical-fill-color);
+  background-color: rgba(0, 0, 0, 0.3) !important;
 }
 .wx-milestone.wx-critical.wx-GKbcLEGA .wx-content {
   background-color: var(--wx-gantt-critical-color);
@@ -272,7 +272,7 @@
   background-color: var(--wx-gantt-summary-critical-color);
 }
 .wx-summary.wx-critical .wx-progress-percent {
-  background-color: var(--wx-gantt-summary-critical-fill-color);
+  background-color: rgba(0, 0, 0, 0.3) !important;
 }
 .wx-summary.wx-critical.wx-selected.wx-GKbcLEGA {
   border: 1px solid var(--wx-gantt-summary-critical-color);
@@ -298,7 +298,7 @@
   border: 1px solid var(--wx-gantt-task-critical-color);
 }
 .wx-critical.wx-GKbcLEGA .wx-segment .wx-progress-percent {
-  background-color: var(--wx-gantt-task-critical-fill-color);
+  background-color: rgba(0, 0, 0, 0.3) !important;
 }
 .wx-critical.wx-split.wx-GKbcLEGA .wx-link.wx-selected,
 .wx-critical.wx-split.wx-GKbcLEGA .wx-link.wx-selected .wx-inner {

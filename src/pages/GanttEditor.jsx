@@ -8,7 +8,7 @@ import {
   registerEditorItem,
 } from '../index.js';
 import { defaultColumns } from '@svar-ui/gantt-store';
-import { Combo } from '@svar-ui/react-core';
+import { Button, Combo, MultiCombo, Segmented } from '@svar-ui/react-core';
 import {
   createJalaliScales,
   createJalaliHighlightTime,
@@ -16,6 +16,7 @@ import {
 } from '../helpers/jalaliCalendar.js';
 import '../components/jalali-styles.css';
 import '../components/assignee/AssigneeUI.css';
+import './GanttEditor.css';
 
 // Base styles from SVAR UI packages
 import '@svar-ui/react-core/style.css';
@@ -72,21 +73,50 @@ export default function GanttEditor() {
   const [tasks, setTasks] = useState(defaultTasks);
   const [links, setLinks] = useState(defaultLinks);
   const [assignees, setAssignees] = useState([]);
+  const [categories, setCategories] = useState([]);
 
-  // Register searchable combo control for the editor (used for Assignee)
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsTab, setSettingsTab] = useState('assignee'); // assignee | category
+
+  // Close settings on Escape
+  useEffect(() => {
+    if (!settingsOpen) return;
+    const onKeyDown = (e) => {
+      if (e.key === 'Escape') setSettingsOpen(false);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [settingsOpen]);
+
+  // Register searchable combo controls for the editor (Assignees)
   useEffect(() => {
     registerEditorItem('combo', Combo);
+    registerEditorItem('multicombo', MultiCombo);
   }, []);
   const safeTasks = useMemo(() => {
     // Guard against `open: true` with missing children data (causes gantt-store crash)
     if (!Array.isArray(tasks)) return [];
     return tasks.map((t) => {
       if (!t) return t;
-      // Normalize assigneeId to string so it matches assignee option ids
-      const normalized =
-        t.assigneeId !== undefined && t.assigneeId !== null
-          ? { ...t, assigneeId: String(t.assigneeId) }
-          : t;
+      // Backward-compatible migration:
+      // - old: assigneeId (string|number)
+      // - new: assigneeIds (string[])
+      let normalized = t;
+      if (Array.isArray(t.assigneeIds)) {
+        normalized = {
+          ...t,
+          assigneeIds: t.assigneeIds
+            .filter((x) => x !== undefined && x !== null && x !== '')
+            .map((x) => String(x)),
+        };
+      } else if (t.assigneeId !== undefined && t.assigneeId !== null && t.assigneeId !== '') {
+        normalized = { ...t, assigneeIds: [String(t.assigneeId)] };
+      }
+
+      // Normalize categoryId to string
+      if (normalized.categoryId !== undefined && normalized.categoryId !== null && normalized.categoryId !== '') {
+        normalized = { ...normalized, categoryId: String(normalized.categoryId) };
+      }
 
       if (normalized.open === true && !Array.isArray(normalized.data)) {
         const { open, ...rest } = normalized;
@@ -103,14 +133,16 @@ export default function GanttEditor() {
     Promise.all([
       fetch('/api/gantt').then((res) => res.json()),
       fetch('/api/assignees').then((res) => res.json()),
+      fetch('/api/categories').then((res) => res.json()),
     ])
-      .then(([data, a]) => {
+      .then(([data, a, c]) => {
         if (cancelled) return;
         const nextTasks = parseDates(data?.tasks);
         const nextLinks = Array.isArray(data?.links) ? data.links : [];
         setTasks(nextTasks.length ? nextTasks : defaultTasks);
         setLinks(nextLinks);
         setAssignees(Array.isArray(a) ? a : []);
+        setCategories(Array.isArray(c) ? c : []);
       })
       .catch(() => {
         // fallback to defaults
@@ -120,6 +152,44 @@ export default function GanttEditor() {
       cancelled = true;
     };
   }, []);
+
+  // Inject CSS rules for category colors
+  useEffect(() => {
+    const styleId = 'gantt-category-colors';
+    let styleEl = document.getElementById(styleId);
+    if (!styleEl) {
+      styleEl = document.createElement('style');
+      styleEl.id = styleId;
+      document.head.appendChild(styleEl);
+    }
+
+    // Default: gray background for bars without category
+    let css = `
+      .wx-bar.wx-GKbcLEGA:not([data-category-id]):not([data-category-id=""]),
+      .wx-bar.wx-GKbcLEGA[data-category-id=""] {
+        background-color: #808080 !important;
+      }
+    `;
+
+    // Category-specific colors
+    if (Array.isArray(categories)) {
+      categories.forEach((cat) => {
+        if (cat?.id && cat?.color) {
+          css += `
+            .wx-bar.wx-GKbcLEGA[data-category-id="${cat.id}"] {
+              background-color: ${cat.color} !important;
+            }
+          `;
+        }
+      });
+    }
+
+    styleEl.textContent = css;
+
+    return () => {
+      // Don't remove the style element on unmount, as it might be used by other instances
+    };
+  }, [categories]);
 
   const assigneesById = useMemo(() => {
     const map = new Map();
@@ -134,22 +204,35 @@ export default function GanttEditor() {
     return map;
   }, [assignees]);
 
+  const categoriesById = useMemo(() => {
+    const map = new Map();
+    if (Array.isArray(categories)) {
+      categories.forEach((c) => {
+        if (!c) return;
+        map.set(c.id, c);
+        // also allow numeric lookups if any task stores number ids
+        if (c.id !== undefined && c.id !== null) map.set(Number(c.id), c);
+      });
+    }
+    return map;
+  }, [categories]);
+
   const editorItems = useMemo(() => {
     const base = getEditorItems().map((i) => ({ ...i }));
     const typeIndex = base.findIndex((i) => i.key === 'type');
     const insertAt = typeIndex >= 0 ? typeIndex + 1 : 1;
 
     const assigneeItem = {
-      key: 'assigneeId',
-      comp: 'combo',
-      label: 'Assignee',
+      key: 'assigneeIds',
+      comp: 'multicombo',
+      label: 'Assignees',
       options: assignees,
       config: {
-        placeholder: 'Select assignee',
+        placeholder: 'Select assignees',
         clear: true,
         textField: 'label',
       },
-      // Render option with avatar (Combo supports render prop children via { option })
+      // Render option with avatar (MultiCombo supports render prop children via { option })
       children: ({ option }) => (
         <div className="wx-assignee-option">
           <div className="wx-assignee-avatar">
@@ -160,9 +243,34 @@ export default function GanttEditor() {
       ),
     };
 
+    const categoryItem = {
+      key: 'categoryId',
+      comp: 'combo',
+      label: 'Category',
+      options: categories,
+      config: {
+        placeholder: 'Select category',
+        clear: true,
+        textField: 'name',
+      },
+      // Render option with color dot
+      children: ({ option }) => (
+        <div className="wx-assignee-option">
+          <div
+            className="wx-category-dot16"
+            style={{ backgroundColor: option?.color || '#ccc' }}
+          />
+          <div>{option?.name ?? ''}</div>
+        </div>
+      ),
+    };
+
     base.splice(insertAt, 0, assigneeItem);
+    // Insert category after assignees
+    const assigneeItemIndex = base.findIndex((i) => i.key === 'assigneeIds');
+    base.splice(assigneeItemIndex + 1, 0, categoryItem);
     return base;
-  }, [assignees]);
+  }, [assignees, categories]);
 
   // Initialize Gantt API and set up event handlers
   const init = useCallback(
@@ -192,12 +300,22 @@ export default function GanttEditor() {
                 'parent',
                 'type',
                 'details',
-                'assigneeId',
+                'assigneeIds',
+                'categoryId',
                 'unscheduled',
               ];
               keep.forEach((k) => {
                 if (t[k] !== undefined) clean[k] = t[k];
               });
+              // Backward-compat: if something wrote assigneeId, migrate to assigneeIds before saving
+              if (
+                (clean.assigneeIds === undefined || clean.assigneeIds === null) &&
+                t.assigneeId !== undefined &&
+                t.assigneeId !== null &&
+                t.assigneeId !== ''
+              ) {
+                clean.assigneeIds = [String(t.assigneeId)];
+              }
               out.set(clean.id, clean);
               if (Array.isArray(t.data)) walk(t.data);
             });
@@ -289,13 +407,32 @@ export default function GanttEditor() {
 
   const TaskTemplate = useMemo(() => {
     return function AssigneeTaskTemplate({ data }) {
-      const assignee = assigneesById.get(data?.assigneeId);
+      const ids = Array.isArray(data?.assigneeIds)
+        ? data.assigneeIds
+        : data?.assigneeId !== undefined && data?.assigneeId !== null && data?.assigneeId !== ''
+          ? [data.assigneeId]
+          : [];
+      const assigneeList = ids
+        .map((id) => assigneesById.get(String(id)) || assigneesById.get(Number(id)))
+        .filter(Boolean);
+      const visible = assigneeList.slice(0, 3);
+      const extraCount = Math.max(0, assigneeList.length - visible.length);
+
       // Milestone text is rendered outside; still show avatar if exists
       if (data?.type === 'milestone') {
-        return assignee?.avatar ? (
+        return visible.length ? (
           <div className="wx-assignee-task">
-            <div className="wx-assignee-avatar">
-              <img src={assignee.avatar} alt="" />
+            <div className="wx-assignee-avatar-stack">
+              {visible.map((a, i) => (
+                <div
+                  key={`${a.id}-${i}`}
+                  className="wx-assignee-avatar"
+                  style={{ marginLeft: i === 0 ? 0 : -8, zIndex: 10 - i }}
+                >
+                  {a?.avatar ? <img src={a.avatar} alt="" /> : null}
+                </div>
+              ))}
+              {extraCount ? <div className="wx-assignee-more">+{extraCount}</div> : null}
             </div>
           </div>
         ) : null;
@@ -303,9 +440,18 @@ export default function GanttEditor() {
 
       return (
         <div className="wx-assignee-task">
-          {assignee?.avatar ? (
-            <div className="wx-assignee-avatar">
-              <img src={assignee.avatar} alt="" />
+          {visible.length ? (
+            <div className="wx-assignee-avatar-stack">
+              {visible.map((a, i) => (
+                <div
+                  key={`${a.id}-${i}`}
+                  className="wx-assignee-avatar"
+                  style={{ marginLeft: i === 0 ? 0 : -8, zIndex: 10 - i }}
+                >
+                  {a?.avatar ? <img src={a.avatar} alt="" /> : null}
+                </div>
+              ))}
+              {extraCount ? <div className="wx-assignee-more">+{extraCount}</div> : null}
             </div>
           ) : null}
           <div className="wx-assignee-task-text">{data?.text || ''}</div>
@@ -314,23 +460,136 @@ export default function GanttEditor() {
     };
   }, [assigneesById]);
 
+  const settingsTabs = useMemo(
+    () => [
+      { id: 'assignee', label: 'Assignee' },
+      { id: 'category', label: 'Category' },
+    ],
+    []
+  );
+
+  const AssigneeAvatar48 = useMemo(() => {
+    return function AssigneeAvatar48Inner({ avatar, name }) {
+      const [broken, setBroken] = useState(false);
+      return (
+        <div className="wx-settings-avatar48" aria-label={name || ''}>
+          {!broken && avatar ? (
+            <img
+              src={avatar}
+              alt=""
+              onError={() => setBroken(true)}
+              loading="lazy"
+            />
+          ) : null}
+        </div>
+      );
+    };
+  }, []);
+
   return (
-    <div style={{ height: '100vh' }}>
-      <Willow>
-        <ContextMenu api={api}>
-          <Gantt
-            init={init}
-            tasks={safeTasks}
-            links={Array.isArray(links) ? links : []}
-            scales={scales}
-            {...(columns && { columns })}
-            taskTemplate={TaskTemplate}
-            end={endDate}
-            highlightTime={highlightTime}
-          />
-        </ContextMenu>
-        {api && <Editor api={api} items={editorItems} />}
-      </Willow>
+    <div style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
+      <div className="wx-gantt-editor-header">
+        <div className="wx-gantt-editor-header-title">
+          <img src="/logo.svg" alt="Logo" className="wx-gantt-editor-logo" />
+          <h1>Shopping Redesign & Design System unified roadmap</h1>
+        </div>
+        <div className="wx-gantt-editor-header-actions">
+          <Button
+            type="secondary"
+            icon="wxi-settings"
+            css="wx-gantt-editor-settings-btn"
+            onClick={() => setSettingsOpen(true)}
+          >
+            Settings
+          </Button>
+        </div>
+      </div>
+      <div style={{ flex: 1, overflow: 'hidden' }}>
+        <Willow>
+          <ContextMenu api={api}>
+            <Gantt
+              init={init}
+              tasks={safeTasks}
+              links={Array.isArray(links) ? links : []}
+              scales={scales}
+              {...(columns && { columns })}
+              taskTemplate={TaskTemplate}
+              end={endDate}
+              highlightTime={highlightTime}
+            />
+          </ContextMenu>
+          {api && <Editor api={api} items={editorItems} />}
+          {settingsOpen ? (
+            <div
+              className="wx-1FxkZa wx-modal"
+              role="dialog"
+              aria-modal="true"
+              onMouseDown={(e) => {
+                // only close when clicking the backdrop (not inside the window)
+                if (e.target === e.currentTarget) setSettingsOpen(false);
+              }}
+              onClick={(e) => {
+                // also handle normal click (some browsers/devices don't fire mousedown as expected)
+                if (e.target === e.currentTarget) setSettingsOpen(false);
+              }}
+            >
+              <div
+                className="wx-1FxkZa wx-window"
+                // no-op; events are handled by the backdrop guard above
+              >
+                <div className="wx-1FxkZa wx-header">
+                  <div className="wx-settings-modal-header">
+                    <div className="wx-settings-modal-title">Settings</div>
+                    <Button
+                      type="secondary"
+                      icon="wxi-close"
+                      css="wx-settings-close-btn"
+                      onClick={() => setSettingsOpen(false)}
+                    />
+                  </div>
+                </div>
+                <div className="wx-settings-modal">
+                  <div className="wx-settings-tabs">
+                    <Segmented
+                      value={settingsTab}
+                      options={settingsTabs}
+                      onChange={({ value }) => setSettingsTab(value)}
+                    />
+                  </div>
+
+                  {settingsTab === 'assignee' ? (
+                    <div className="wx-settings-list" role="list">
+                      {assignees.map((u) => (
+                        <div className="wx-settings-row" role="listitem" key={u.id}>
+                          <AssigneeAvatar48 avatar={u.avatar} name={u.label} />
+                          <div className="wx-settings-row-name">{u.label}</div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="wx-settings-list" role="list">
+                      {categories.map((cat, idx) => (
+                        <div
+                          className="wx-settings-row"
+                          role="listitem"
+                          key={`${cat.name}-${idx}`}
+                        >
+                          <div
+                            className="wx-settings-color24"
+                            style={{ backgroundColor: cat.color || '#dfe2e6' }}
+                            aria-label={cat.name || ''}
+                          />
+                          <div className="wx-settings-row-name">{cat.name}</div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          ) : null}
+        </Willow>
+      </div>
     </div>
   );
 }

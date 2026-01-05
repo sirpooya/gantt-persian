@@ -32,6 +32,22 @@
   flex: 0 0 24px;
 }
 
+.wx-assignee-avatar-stack {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+}
+
+.wx-assignee-more {
+  margin-left: 6px;
+  font-size: 11px;
+  line-height: 1;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.12);
+  color: rgba(0, 0, 0, 0.8);
+}
+
 .wx-assignee-task-text {
   white-space: nowrap;
   overflow: hidden;

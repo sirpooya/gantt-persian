@@ -16,6 +16,7 @@ export default defineConfig(({ command, mode }) => {
           configureServer(server) {
             const dataFile = path.resolve(process.cwd(), 'data', 'gantt-data.json');
             const assigneesFile = path.resolve(process.cwd(), 'data', 'assignee.json');
+            const categoriesFile = path.resolve(process.cwd(), 'data', 'category.json');
             const avatarsDir = path.resolve(process.cwd(), 'data', 'avatars');
 
             const readData = () => {
@@ -78,6 +79,19 @@ export default defineConfig(({ command, mode }) => {
               res.setHeader('Content-Type', 'application/json; charset=utf-8');
               try {
                 const raw = fs.readFileSync(assigneesFile, 'utf8');
+                res.statusCode = 200;
+                res.end(raw);
+              } catch (e) {
+                res.statusCode = 200;
+                res.end('[]');
+              }
+            });
+
+            server.middlewares.use('/api/categories', (req, res, next) => {
+              if (req.method !== 'GET') return next();
+              res.setHeader('Content-Type', 'application/json; charset=utf-8');
+              try {
+                const raw = fs.readFileSync(categoriesFile, 'utf8');
                 res.statusCode = 200;
                 res.end(raw);
               } catch (e) {
