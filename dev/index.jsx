@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useCallback } from 'react';
 import ReactDOM from 'react-dom/client';
 import { toJalaali } from 'jalaali-js';
 
@@ -10,6 +10,9 @@ import '@svar-ui/react-menu/style.css';
 import '@svar-ui/react-toolbar/style.css';
 import '@svar-ui/react-comments/style.css';
 import '@svar-ui/react-tasklist/style.css';
+
+// Custom Jalali calendar styles
+import './jalali-styles.css';
 
 // Import directly from SOURCE (no dist build)
 import { Gantt, Willow, defaultColumns } from '../src/index.js';
@@ -30,8 +33,20 @@ const persianMonths = [
   'اسفند',
 ];
 
-// Persian day names (abbreviated)
+// Persian day names (abbreviated - first letter)
+// Saturday=0, Sunday=1, Monday=2, Tuesday=3, Wednesday=4, Thursday=5, Friday=6
 const persianDays = ['ش', 'ی', 'د', 'س', 'چ', 'پ', 'ج'];
+
+// Get Persian weekday first letter from JavaScript date
+function getPersianWeekdayLetter(date) {
+  const jsDay = date.getDay(); // 0=Sunday, 1=Monday, ..., 6=Saturday
+  // Map JS weekday to Persian weekday
+  // JS: 0=Sun, 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri, 6=Sat
+  // Per: 0=Sat(ش), 1=Sun(ی), 2=Mon(د), 3=Tue(س), 4=Wed(چ), 5=Thu(پ), 6=Fri(ج)
+  // Formula: Saturday (6) -> 0, others -> jsDay + 1
+  const persianDayIndex = jsDay === 6 ? 0 : jsDay + 1;
+  return persianDays[persianDayIndex];
+}
 
 // Convert Gregorian date to Jalali and format
 function formatJalaliDate(date, format) {
@@ -47,9 +62,10 @@ function formatJalaliDate(date, format) {
     return `${persianMonths[jalali.jm - 1]} ${jalali.jy}`;
   }
 
-  // Format: %j -> Day number (e.g., "15")
+  // Format: %j -> Day number with weekday letter (e.g., "ش 15")
   if (format === '%j') {
-    return jalali.jd.toString();
+    const weekdayLetter = getPersianWeekdayLetter(gregorianDate);
+    return `${weekdayLetter} ${jalali.jd}`;
   }
 
   // Format: %M %j -> Month Day (e.g., "فروردین 15")
@@ -57,8 +73,9 @@ function formatJalaliDate(date, format) {
     return `${persianMonths[jalali.jm - 1]} ${jalali.jd}`;
   }
 
-  // Default: return day number
-  return jalali.jd.toString();
+  // Default: return day number with weekday letter
+  const weekdayLetter = getPersianWeekdayLetter(gregorianDate);
+  return `${weekdayLetter} ${jalali.jd}`;
 }
 
 // Format Jalali date for columns (e.g., "1405/01/15")
@@ -144,6 +161,18 @@ function App() {
     });
   }, []);
 
+  // Highlight Thursday (پ) and Friday (ج) columns with red tone
+  const highlightTime = useCallback((date, unit) => {
+    if (unit === 'day') {
+      const weekdayLetter = getPersianWeekdayLetter(date);
+      // Thursday = پ, Friday = ج
+      if (weekdayLetter === 'پ' || weekdayLetter === 'ج') {
+        return 'wx-thursday-friday';
+      }
+    }
+    return '';
+  }, []);
+
   // Calculate the end date: one month after the latest task end date
   const endDate = useMemo(() => {
     let maxEndDate = null;
@@ -187,6 +216,7 @@ function App() {
           scales={scales}
           columns={columns}
           end={endDate}
+          highlightTime={highlightTime}
         />
       </Willow>
     </div>

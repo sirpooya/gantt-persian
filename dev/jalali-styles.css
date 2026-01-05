@@ -1,0 +1,14 @@
+/* Red tone styling for Thursday (پ) and Friday (ج) columns */
+/* Scale cells */
+.wx-cell.wx-thursday-friday.wx-ZkvhDKir {
+  background-color: #ffebee;
+  color: #c62828;
+}
+
+/* Chart cells (holiday overlay) */
+.wx-thursday-friday.wx-mR7v2Xag {
+  height: 100%;
+  background-color: #ffebee;
+  position: absolute;
+}
+
