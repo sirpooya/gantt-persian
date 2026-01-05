@@ -1,0 +1,30 @@
+.wx-scale.wx-ZkvhDKir {
+  position: sticky;
+  top: 0;
+  background-color: var(--wx-background);
+  box-shadow: var(--wx-timescale-shadow);
+  z-index: 5;
+}
+
+.wx-row.wx-ZkvhDKir,
+.wx-cell.wx-ZkvhDKir {
+  display: flex;
+  box-sizing: border-box;
+}
+
+.wx-row.wx-ZkvhDKir {
+  border-bottom: var(--wx-gantt-border);
+}
+
+.wx-cell.wx-ZkvhDKir {
+  justify-content: center;
+  align-items: center;
+  border-right: var(--wx-timescale-border);
+  font: var(--wx-timescale-font);
+  color: var(--wx-timescale-font-color);
+}
+
+.wx-cell.wx-weekend.wx-ZkvhDKir {
+  background: var(--wx-gantt-holiday-background);
+  color: var(--wx-gantt-holiday-color);
+}

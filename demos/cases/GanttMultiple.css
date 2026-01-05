@@ -1,0 +1,26 @@
+.rows.wx-NlISAKUQ {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.row.wx-NlISAKUQ {
+  padding: 13px;
+}
+
+.ganttCell.wx-NlISAKUQ {
+  height: 410px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 10px;
+}
+
+.ganttHeader.wx-NlISAKUQ {
+  padding: 13px;
+  border-bottom: var(--wx-gantt-border);
+}
+
+.ganttBox.wx-NlISAKUQ {
+  overflow: hidden;
+}

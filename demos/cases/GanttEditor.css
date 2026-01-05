@@ -1,0 +1,14 @@
+.wx-6xDuvBVG .gantt_task_line .gantt_link_control {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.wx-6xDuvBVG .gantt_task_line .gantt_link_control .gantt_link_point {
+  position: relative;
+  top: auto;
+  left: auto;
+  right: auto;
+  bottom: auto;
+  margin: 0 3px;
+}

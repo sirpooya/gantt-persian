@@ -1,0 +1,20 @@
+.rows.wx-FkPcChng {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.bar.wx-FkPcChng {
+  padding: 12px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+.gtcell.wx-FkPcChng {
+  position: relative;
+  height: calc(100% - 56px);
+  border-top: var(--wx-gantt-border);
+}

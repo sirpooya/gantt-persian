@@ -1,0 +1,31 @@
+.rows.wx-q0L4gF4x {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.bar.wx-q0L4gF4x {
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.gtcell.wx-q0L4gF4x {
+  position: relative;
+  height: 100%;
+  border-top: var(--wx-gantt-border);
+  overflow: hidden;
+}
+.label.wx-q0L4gF4x {
+  padding-right: 10px;
+  font-size: var(--wx-font-size);
+  font-weight: var(--wx-label-font-weight);
+}
+i.wx-q0L4gF4x {
+  position: relative;
+  right: -5px;
+}

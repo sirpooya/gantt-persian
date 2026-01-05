@@ -1,0 +1,27 @@
+.rows.wx-DZzpn0qn {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  background: var(--wx-background);
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.bar.wx-DZzpn0qn {
+  padding: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.gtcell.wx-DZzpn0qn {
+  position: relative;
+  height: 100%;
+  border-top: var(--wx-gantt-border);
+  overflow: hidden;
+}
+.label.wx-DZzpn0qn {
+  padding-right: 20px;
+  font-size: var(--wx-font-size);
+}

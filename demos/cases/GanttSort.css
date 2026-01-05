@@ -1,0 +1,12 @@
+.demo.wx-fr1PMpDW {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  height: 100%;
+}
+
+.gtcell.wx-fr1PMpDW {
+  overflow: hidden;
+  border: var(--wx-gantt-border);
+  height: calc(100% - 32px);
+}

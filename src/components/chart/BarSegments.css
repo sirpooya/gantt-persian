@@ -1,0 +1,22 @@
+.wx-segments.wx-GKbcLEGA {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+.wx-segment.wx-GKbcLEGA {
+  height: 100%;
+}
+.wx-segments.wx-GKbcLEGA::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 100%;
+  height: 0;
+  border-top: 1px dashed #7f7f7f;
+  transform: translateY(-50%);
+}
+
+.wx-progress-percent.wx-GKbcLEGA {
+  background-color: var(--wx-gantt-task-fill-color);
+}

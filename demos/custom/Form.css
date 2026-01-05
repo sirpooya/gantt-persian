@@ -1,0 +1,66 @@
+.backdrop.wx-QkE5vh0y {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  right: 0;
+  z-index: 5;
+  background: var(--wx-modal-backdrop);
+}
+
+.modal.wx-QkE5vh0y {
+  position: relative;
+  width: 340px;
+  padding: 20px;
+  border-radius: 6px;
+  box-shadow:
+    0 4px 4px rgba(0, 0, 0, 0.12),
+    0 0 10px rgba(0, 0, 0, 0.06);
+  background-color: var(--wx-background);
+  font-family: var(--wx-font-family);
+  font-size: var(--wx-font-size);
+  color: var(--wx-color-font);
+}
+
+.title.wx-QkE5vh0y {
+  margin: 0;
+}
+
+.close.wx-QkE5vh0y {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  cursor: pointer;
+  font-weight: 700;
+  transition: color 0.15s ease-in;
+}
+
+.close.wx-QkE5vh0y:hover {
+  color: rgb(255, 122, 122);
+}
+
+.body.wx-QkE5vh0y {
+  margin: 20px 0 0 0;
+}
+
+.button.wx-QkE5vh0y {
+  padding: 10px;
+  margin: 1.5em 0 0 0;
+  box-sizing: border-box;
+  border: 1px solid #ccc;
+  border-radius: 2px;
+  font-family: var(--wx-font-family);
+  font-size: var(--wx-font-size);
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.button.wx-QkE5vh0y:focus {
+  outline: none;
+  opacity: 0.7;
+}
+
+.danger.wx-QkE5vh0y {
+  color: var(--wx-color-danger-font);
+  background-color: var(--wx-color-danger);
+}

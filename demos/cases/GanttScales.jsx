@@ -1,0 +1,21 @@
+import { useMemo } from 'react';
+import { getData, complexScales } from '../data';
+import { Gantt } from '../../src/';
+
+function GanttScales({ skinSettings }) {
+  const data = useMemo(() => getData(), []);
+
+  return (
+    <Gantt
+      {...skinSettings}
+      tasks={data.tasks}
+      links={data.links}
+      scales={complexScales}
+      start={new Date(2026, 3, 1)}
+      end={new Date(2026, 4, 12)}
+      cellWidth={60}
+    />
+  );
+}
+
+export default GanttScales;

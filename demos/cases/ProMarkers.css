@@ -1,0 +1,10 @@
+.gt-cell.wx-g4H1PKcW {
+  width: 100%;
+  height: 100%;
+}
+.gt-cell.wx-g4H1PKcW > .wx-gantt .myMiddleClass {
+  background-color: rgba(255, 84, 84, 0.77);
+}
+.gt-cell.wx-g4H1PKcW > .wx-gantt .myEndClass {
+  background-color: rgba(54, 206, 124, 0.77);
+}

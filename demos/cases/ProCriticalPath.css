@@ -1,0 +1,12 @@
+.demo.wx-D71fWZ6y {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.bar.wx-D71fWZ6y {
+  display: flex;
+  justify-content: center;
+  padding: 12px;
+  border-bottom: var(--wx-gantt-border);
+}

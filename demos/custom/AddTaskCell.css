@@ -1,0 +1,9 @@
+.text.wx-4RuF7aAO {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+}
+.text.wx-4RuF7aAO:hover {
+  text-decoration: underline;
+  color: var(--wx-color-link);
+}

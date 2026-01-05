@@ -1,0 +1,18 @@
+.rows.wx-ycv5Oz8L {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.bar.wx-ycv5Oz8L {
+  padding: 12px;
+  border-bottom: var(--wx-gantt-border);
+}
+.gtcell.wx-ycv5Oz8L {
+  position: relative;
+  height: calc(100% - 106px);
+  border-top: var(--wx-gantt-border);
+}

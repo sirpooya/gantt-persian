@@ -1,0 +1,23 @@
+.demo.wx-vkht5Uh1 {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.bar.wx-vkht5Uh1 {
+  display: flex;
+  align-items: center;
+  padding: 12px;
+  gap: 20px;
+  border-bottom: var(--wx-gantt-border);
+}
+
+.gantt.wx-vkht5Uh1 {
+  position: relative;
+  height: 100%;
+  overflow: hidden;
+}
+
+.bar.wx-left.wx-vkht5Uh1 .wx-field {
+  margin-bottom: 0px;
+}

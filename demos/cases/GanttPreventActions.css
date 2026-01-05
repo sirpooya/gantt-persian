@@ -1,0 +1,48 @@
+.rows.wx-RPSbwjNq {
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.bar.wx-RPSbwjNq {
+  display: flex;
+  height: 60px;
+  align-items: end;
+  font-family: var(--wx-font-family);
+  font-size: var(--wx-font-size);
+  padding: 12px 0;
+  --wx-label-width: 130px;
+}
+
+.bar.wx-RPSbwjNq:first-child {
+  margin-left: 10px;
+}
+
+.gantt.wx-RPSbwjNq {
+  height: 100%;
+  position: relative;
+  border-top: var(--wx-gantt-border);
+  overflow: hidden;
+}
+
+.gantt.wx-RPSbwjNq.hide-progress > .wx-gantt .wx-bar .wx-progress-marker {
+  display: none;
+}
+.gantt.wx-RPSbwjNq.hide-links > .wx-gantt .wx-bar .wx-link {
+  display: none;
+}
+.gantt.wx-RPSbwjNq.hide-delete-links > .wx-gantt .wx-delete-link {
+  display: none;
+}
+.gantt.wx-RPSbwjNq.hide-delete-links > .wx-gantt .wx-line:hover {
+  cursor: default;
+  stroke: var(--wx-gantt-link-color);
+}
+.gantt.wx-RPSbwjNq.hide-delete-links > .wx-gantt .wx-line.wx-line-selectable {
+  cursor: default;
+}
+.gantt.wx-RPSbwjNq.hide-drag > .wx-gantt .wx-bar {
+  cursor: pointer !important;
+}
