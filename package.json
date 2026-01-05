@@ -59,6 +59,7 @@
     "react-dom": ">=18"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.89.0",
     "@svar-ui/gantt-data-provider": "2.4.4",
     "@svar-ui/gantt-locales": "2.4.4",
     "@svar-ui/gantt-store": "2.4.4",

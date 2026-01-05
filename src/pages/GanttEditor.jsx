@@ -17,6 +17,7 @@ import {
 import '../components/jalali-styles.css';
 import '../components/assignee/AssigneeUI.css';
 import './GanttEditor.css';
+import { loadGanttData, saveGanttData } from '../lib/ganttService.js';
 
 // Base styles from SVAR UI packages
 import '@svar-ui/react-core/style.css';
@@ -143,12 +144,12 @@ export default function GanttEditor() {
     });
   }, [tasks]);
 
-  // Load data from JSON file on mount
+  // Load data from Supabase Storage (JSON file) on mount
   useEffect(() => {
     let cancelled = false;
 
     Promise.all([
-      fetch('/api/gantt').then((res) => res.json()),
+      loadGanttData(),
       fetch('/api/assignees').then((res) => res.json()),
       fetch('/api/categories').then((res) => res.json()),
     ])
@@ -161,8 +162,13 @@ export default function GanttEditor() {
         setAssignees(Array.isArray(a) ? a : []);
         setCategories(Array.isArray(c) ? c : []);
       })
-      .catch(() => {
-        // fallback to defaults
+      .catch((error) => {
+        console.error('Error loading data:', error);
+        // fallback to defaults - ensure app still renders
+        setTasks(defaultTasks);
+        setLinks([]);
+        setAssignees([]);
+        setCategories([]);
       });
 
     return () => {
@@ -346,11 +352,9 @@ export default function GanttEditor() {
           links: currentLinks,
         };
 
-        fetch('/api/gantt', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(dataToSave),
-        }).catch(() => {});
+        saveGanttData(dataToSave).catch((error) => {
+          console.error('Error saving Gantt data:', error);
+        });
       };
 
       // Listen to all change events
