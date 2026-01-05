@@ -1,9 +1,9 @@
 [
-  { "id": "1", "name": "Design", "color": "#7C4DFF" },
-  { "id": "2", "name": "Backend", "color": "#1E88E5" },
-  { "id": "3", "name": "Frontend", "color": "#00ACC1" },
-  { "id": "4", "name": "QA", "color": "#43A047" },
-  { "id": "5", "name": "Blocked", "color": "#E53935" }
+  { "id": "1", "name": "Design", "color": "#FF7300" },
+  { "id": "2", "name": "Front Web", "color": "#0088FE" },
+  { "id": "3", "name": "Front App", "color": "#00C49F" },
+  { "id": "4", "name": "Core Design", "color": "#FF00B2" },
+  { "id": "5", "name": "Core Dev", "color": "#A259FF" }
 ]
 
 

@@ -51,8 +51,16 @@ function parseDates(arr) {
   if (!Array.isArray(arr)) return [];
   return arr.map((item) => {
     const out = { ...item };
-    if (out.start) out.start = new Date(out.start);
-    if (out.end) out.end = new Date(out.end);
+    // Normalize all persisted dates to LOCAL midnight to avoid timezone/DST rendering issues.
+    // (If we store "00:00Z" it becomes 03:30 local in Iran and spans 2 day-cells.)
+    const toLocalMidnight = (v) => {
+      if (!v) return v;
+      const d = v instanceof Date ? v : new Date(v);
+      if (Number.isNaN(d.getTime())) return v;
+      return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    };
+    if (out.start) out.start = toLocalMidnight(out.start);
+    if (out.end) out.end = toLocalMidnight(out.end);
     return out;
   });
 }
@@ -61,8 +69,15 @@ function serializeDates(arr) {
   if (!Array.isArray(arr)) return [];
   return arr.map((item) => {
     const out = { ...item };
-    if (out.start instanceof Date) out.start = out.start.toISOString();
-    if (out.end instanceof Date) out.end = out.end.toISOString();
+    // Persist as YYYY-MM-DD (local date) to keep day-precision stable across timezones
+    const toYmd = (d) => {
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const dd = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${dd}`;
+    };
+    if (out.start instanceof Date) out.start = toYmd(out.start);
+    if (out.end instanceof Date) out.end = toYmd(out.end);
     return out;
   });
 }
@@ -117,6 +132,8 @@ export default function GanttEditor() {
       if (normalized.categoryId !== undefined && normalized.categoryId !== null && normalized.categoryId !== '') {
         normalized = { ...normalized, categoryId: String(normalized.categoryId) };
       }
+      
+      // Keep dates at local midnight; parseDates/serializeDates handle this.
 
       if (normalized.open === true && !Array.isArray(normalized.data)) {
         const { open, ...rest } = normalized;
