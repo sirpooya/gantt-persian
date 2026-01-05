@@ -2,15 +2,17 @@
   "tasks": [
     {
       "id": 1,
-      "text": "My Project",
+      "text": "مالقبز",
       "start": "2026-01-05T00:00:00.000Z",
-      "duration": 10,
-      "progress": 30,
+      "end": "2026-01-09T00:00:00.000Z",
+      "duration": 4,
+      "progress": 35,
       "parent": 0,
-      "type": "task"
+      "type": "task",
+      "details": "",
+      "assigneeId": "3",
+      "unscheduled": false
     }
   ],
   "links": []
 }
-
-

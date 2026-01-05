@@ -15,6 +15,8 @@ export default defineConfig(({ command, mode }) => {
           name: 'gantt-json-api',
           configureServer(server) {
             const dataFile = path.resolve(process.cwd(), 'data', 'gantt-data.json');
+            const assigneesFile = path.resolve(process.cwd(), 'data', 'assignee.json');
+            const avatarsDir = path.resolve(process.cwd(), 'data', 'avatars');
 
             const readData = () => {
               try {
@@ -69,6 +71,40 @@ export default defineConfig(({ command, mode }) => {
               }
 
               next();
+            });
+
+            server.middlewares.use('/api/assignees', (req, res, next) => {
+              if (req.method !== 'GET') return next();
+              res.setHeader('Content-Type', 'application/json; charset=utf-8');
+              try {
+                const raw = fs.readFileSync(assigneesFile, 'utf8');
+                res.statusCode = 200;
+                res.end(raw);
+              } catch (e) {
+                res.statusCode = 200;
+                res.end('[]');
+              }
+            });
+
+            // Serve avatars from /data/avatars/*.png (so assignee.json can reference them)
+            server.middlewares.use('/data/avatars', (req, res, next) => {
+              if (req.method !== 'GET' && req.method !== 'HEAD') return next();
+              const urlPath = decodeURIComponent(req.url || '/');
+              const rel = urlPath.replace(/^\//, ''); // strip leading slash
+              const filePath = path.resolve(avatarsDir, rel);
+              // prevent path traversal
+              if (!filePath.startsWith(avatarsDir)) return next();
+              if (!fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) return next();
+
+              const ext = path.extname(filePath).toLowerCase();
+              if (ext === '.png') res.setHeader('Content-Type', 'image/png');
+              else if (ext === '.jpg' || ext === '.jpeg')
+                res.setHeader('Content-Type', 'image/jpeg');
+              else res.setHeader('Content-Type', 'application/octet-stream');
+
+              res.statusCode = 200;
+              if (req.method === 'HEAD') return res.end();
+              fs.createReadStream(filePath).pipe(res);
             });
           },
         },

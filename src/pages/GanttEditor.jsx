@@ -1,12 +1,21 @@
 import React, { useMemo, useCallback, useState, useEffect } from 'react';
-import { Gantt, Willow, ContextMenu, Editor } from '../index.js';
+import {
+  Gantt,
+  Willow,
+  ContextMenu,
+  Editor,
+  getEditorItems,
+  registerEditorItem,
+} from '../index.js';
 import { defaultColumns } from '@svar-ui/gantt-store';
+import { Combo } from '@svar-ui/react-core';
 import {
   createJalaliScales,
   createJalaliHighlightTime,
   formatJalaliDateColumn,
 } from '../helpers/jalaliCalendar.js';
 import '../components/jalali-styles.css';
+import '../components/assignee/AssigneeUI.css';
 
 // Base styles from SVAR UI packages
 import '@svar-ui/react-core/style.css';
@@ -62,15 +71,28 @@ export default function GanttEditor() {
   // Initialize with default data immediately (not empty array)
   const [tasks, setTasks] = useState(defaultTasks);
   const [links, setLinks] = useState(defaultLinks);
+  const [assignees, setAssignees] = useState([]);
+
+  // Register searchable combo control for the editor (used for Assignee)
+  useEffect(() => {
+    registerEditorItem('combo', Combo);
+  }, []);
   const safeTasks = useMemo(() => {
     // Guard against `open: true` with missing children data (causes gantt-store crash)
     if (!Array.isArray(tasks)) return [];
     return tasks.map((t) => {
-      if (t && t.open === true && !Array.isArray(t.data)) {
-        const { open, ...rest } = t;
+      if (!t) return t;
+      // Normalize assigneeId to string so it matches assignee option ids
+      const normalized =
+        t.assigneeId !== undefined && t.assigneeId !== null
+          ? { ...t, assigneeId: String(t.assigneeId) }
+          : t;
+
+      if (normalized.open === true && !Array.isArray(normalized.data)) {
+        const { open, ...rest } = normalized;
         return rest;
       }
-      return t;
+      return normalized;
     });
   }, [tasks]);
 
@@ -78,14 +100,17 @@ export default function GanttEditor() {
   useEffect(() => {
     let cancelled = false;
 
-    fetch('/api/gantt')
-      .then((res) => res.json())
-      .then((data) => {
+    Promise.all([
+      fetch('/api/gantt').then((res) => res.json()),
+      fetch('/api/assignees').then((res) => res.json()),
+    ])
+      .then(([data, a]) => {
         if (cancelled) return;
         const nextTasks = parseDates(data?.tasks);
         const nextLinks = Array.isArray(data?.links) ? data.links : [];
         setTasks(nextTasks.length ? nextTasks : defaultTasks);
         setLinks(nextLinks);
+        setAssignees(Array.isArray(a) ? a : []);
       })
       .catch(() => {
         // fallback to defaults
@@ -95,6 +120,49 @@ export default function GanttEditor() {
       cancelled = true;
     };
   }, []);
+
+  const assigneesById = useMemo(() => {
+    const map = new Map();
+    if (Array.isArray(assignees)) {
+      assignees.forEach((a) => {
+        if (!a) return;
+        map.set(a.id, a);
+        // also allow numeric lookups if any task stores number ids
+        if (a.id !== undefined && a.id !== null) map.set(Number(a.id), a);
+      });
+    }
+    return map;
+  }, [assignees]);
+
+  const editorItems = useMemo(() => {
+    const base = getEditorItems().map((i) => ({ ...i }));
+    const typeIndex = base.findIndex((i) => i.key === 'type');
+    const insertAt = typeIndex >= 0 ? typeIndex + 1 : 1;
+
+    const assigneeItem = {
+      key: 'assigneeId',
+      comp: 'combo',
+      label: 'Assignee',
+      options: assignees,
+      config: {
+        placeholder: 'Select assignee',
+        clear: true,
+        textField: 'label',
+      },
+      // Render option with avatar (Combo supports render prop children via { option })
+      children: ({ option }) => (
+        <div className="wx-assignee-option">
+          <div className="wx-assignee-avatar">
+            {option?.avatar ? <img src={option.avatar} alt="" /> : null}
+          </div>
+          <div>{option?.label ?? ''}</div>
+        </div>
+      ),
+    };
+
+    base.splice(insertAt, 0, assigneeItem);
+    return base;
+  }, [assignees]);
 
   // Initialize Gantt API and set up event handlers
   const init = useCallback(
@@ -107,8 +175,39 @@ export default function GanttEditor() {
         const state = ganttApi.getState();
         const currentLinks = state._links || [];
 
+        const flattenAndPickTasks = (tree) => {
+          const out = new Map();
+          const walk = (arr) => {
+            if (!Array.isArray(arr)) return;
+            arr.forEach((t) => {
+              if (!t) return;
+              const clean = {};
+              const keep = [
+                'id',
+                'text',
+                'start',
+                'end',
+                'duration',
+                'progress',
+                'parent',
+                'type',
+                'details',
+                'assigneeId',
+                'unscheduled',
+              ];
+              keep.forEach((k) => {
+                if (t[k] !== undefined) clean[k] = t[k];
+              });
+              out.set(clean.id, clean);
+              if (Array.isArray(t.data)) walk(t.data);
+            });
+          };
+          walk(tree);
+          return Array.from(out.values());
+        };
+
         const dataToSave = {
-          tasks: serializeDates(currentTasks),
+          tasks: serializeDates(flattenAndPickTasks(currentTasks)),
           links: currentLinks,
         };
 
@@ -188,6 +287,33 @@ export default function GanttEditor() {
     return null;
   }, [tasks]);
 
+  const TaskTemplate = useMemo(() => {
+    return function AssigneeTaskTemplate({ data }) {
+      const assignee = assigneesById.get(data?.assigneeId);
+      // Milestone text is rendered outside; still show avatar if exists
+      if (data?.type === 'milestone') {
+        return assignee?.avatar ? (
+          <div className="wx-assignee-task">
+            <div className="wx-assignee-avatar">
+              <img src={assignee.avatar} alt="" />
+            </div>
+          </div>
+        ) : null;
+      }
+
+      return (
+        <div className="wx-assignee-task">
+          {assignee?.avatar ? (
+            <div className="wx-assignee-avatar">
+              <img src={assignee.avatar} alt="" />
+            </div>
+          ) : null}
+          <div className="wx-assignee-task-text">{data?.text || ''}</div>
+        </div>
+      );
+    };
+  }, [assigneesById]);
+
   return (
     <div style={{ height: '100vh' }}>
       <Willow>
@@ -198,11 +324,12 @@ export default function GanttEditor() {
             links={Array.isArray(links) ? links : []}
             scales={scales}
             {...(columns && { columns })}
+            taskTemplate={TaskTemplate}
             end={endDate}
             highlightTime={highlightTime}
           />
         </ContextMenu>
-        {api && <Editor api={api} />}
+        {api && <Editor api={api} items={editorItems} />}
       </Willow>
     </div>
   );
