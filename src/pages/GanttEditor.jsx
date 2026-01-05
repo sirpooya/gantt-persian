@@ -396,7 +396,8 @@ export default function GanttEditor() {
   const endDate = useMemo(() => {
     let maxEndDate = null;
 
-    tasks.forEach((task) => {
+    (Array.isArray(tasks) ? tasks : []).forEach((task) => {
+      if (!task) return;
       let taskEndDate;
 
       if (task.end) {
@@ -420,6 +421,21 @@ export default function GanttEditor() {
     }
 
     return null;
+  }, [tasks]);
+
+  // Always show 1 week before the earliest task start
+  const startDate = useMemo(() => {
+    let minStartDate = null;
+    (Array.isArray(tasks) ? tasks : []).forEach((task) => {
+      if (!task?.start) return;
+      const s = new Date(task.start);
+      if (!minStartDate || s < minStartDate) minStartDate = s;
+    });
+    if (!minStartDate) return null;
+    const d = new Date(minStartDate);
+    d.setHours(0, 0, 0, 0);
+    d.setDate(d.getDate() - 7);
+    return d;
   }, [tasks]);
 
   const TaskTemplate = useMemo(() => {
@@ -531,7 +547,9 @@ export default function GanttEditor() {
               scales={scales}
               {...(columns && { columns })}
               taskTemplate={TaskTemplate}
+              start={startDate}
               end={endDate}
+              autoScale={false}
               highlightTime={highlightTime}
             />
           </ContextMenu>
