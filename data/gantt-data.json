@@ -1,0 +1,16 @@
+{
+  "tasks": [
+    {
+      "id": 1,
+      "text": "My Project",
+      "start": "2026-01-05T00:00:00.000Z",
+      "duration": 10,
+      "progress": 30,
+      "parent": 0,
+      "type": "task"
+    }
+  ],
+  "links": []
+}
+
+

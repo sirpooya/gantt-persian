@@ -35,3 +35,17 @@ export {
   Willow,
   WillowDark,
 };
+
+// Export Jalali calendar helpers
+export {
+  formatJalaliDate,
+  formatJalaliDateColumn,
+  getPersianWeekdayLetter,
+  createJalaliScales,
+  createJalaliHighlightTime,
+  persianMonths,
+  persianDays,
+} from './helpers/jalaliCalendar.js';
+
+// Export GanttEditor component
+export { default as GanttEditor } from './pages/GanttEditor.jsx';
