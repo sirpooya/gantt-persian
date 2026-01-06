@@ -1,0 +1,27 @@
+.wx-gantt-viewer {
+  height: 100vh;
+  width: 100%;
+}
+
+.wx-gantt-viewer .wx-gantt {
+  height: 100%;
+}
+
+/* Viewer is chart-only: hide the time scale header and any interactive affordances */
+.wx-gantt-viewer .wx-scale {
+  display: none !important;
+}
+
+/* Hide link handles and link delete UI */
+.wx-gantt-viewer .wx-link,
+.wx-gantt-viewer .wx-delete-button,
+.wx-gantt-viewer .wx-delete-button-icon {
+  display: none !important;
+}
+
+/* Make bars feel non-interactive */
+.wx-gantt-viewer .wx-bar {
+  cursor: default !important;
+}
+
+

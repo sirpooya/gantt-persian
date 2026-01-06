@@ -49,3 +49,4 @@ export {
 
 // Export GanttEditor component
 export { default as GanttEditor } from './pages/GanttEditor.jsx';
+export { default as GanttViewer } from './pages/GanttViewer.jsx';

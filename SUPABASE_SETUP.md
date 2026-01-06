@@ -10,13 +10,15 @@ This project uses Supabase to store Gantt chart data instead of local JSON files
 
 2. **Create environment file:**
    ```bash
-   cp .env.example .env
+   cp env.example .env
    ```
 
 3. **Add your credentials to `.env`:**
    ```env
    VITE_SUPABASE_URL=https://frmkcwwwaaygrqtcttqb.supabase.co
-   VITE_SUPABASE_ANON_KEY=your-actual-anon-key-here
+   VITE_SUPABASE_PUBLISHABLE_KEY=your-publishable-key-here
+   # (Optional legacy support)
+   # VITE_SUPABASE_ANON_KEY=your-legacy-anon-key-here
    ```
 
 4. **Create the database table:**

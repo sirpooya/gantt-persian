@@ -1,4 +1,4 @@
-import React, { useMemo, useCallback, useState, useEffect } from 'react';
+import React, { useMemo, useCallback, useState, useEffect, useRef } from 'react';
 import {
   Gantt,
   Willow,
@@ -17,7 +17,7 @@ import {
 import '../components/jalali-styles.css';
 import '../components/assignee/AssigneeUI.css';
 import './GanttEditor.css';
-import { loadGanttData, saveGanttData } from '../lib/ganttService.js';
+import { loadAssignees, loadCategories, loadGanttData, saveGanttData } from '../lib/ganttService.js';
 
 // Base styles from SVAR UI packages
 import '@svar-ui/react-core/style.css';
@@ -85,11 +85,14 @@ function serializeDates(arr) {
 
 export default function GanttEditor() {
   const [api, setApi] = useState(null);
+  const hydratedRef = useRef(false);
+  const didScrollToTodayRef = useRef(false);
   // Initialize with default data immediately (not empty array)
   const [tasks, setTasks] = useState(defaultTasks);
   const [links, setLinks] = useState(defaultLinks);
   const [assignees, setAssignees] = useState([]);
   const [categories, setCategories] = useState([]);
+  const [saveState, setSaveState] = useState({ status: 'idle', backend: null, error: null }); // idle|saving|saved|error
 
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsTab, setSettingsTab] = useState('assignee'); // assignee | category
@@ -148,26 +151,49 @@ export default function GanttEditor() {
   useEffect(() => {
     let cancelled = false;
 
-    Promise.all([
-      loadGanttData(),
-      fetch('/api/assignees').then((res) => res.json()),
-      fetch('/api/categories').then((res) => res.json()),
-    ])
-      .then(([data, a, c]) => {
+    // Load Gantt data independently so it isn't lost if assignee/category APIs fail.
+    loadGanttData()
+      .then((data) => {
         if (cancelled) return;
+        console.log('🔎 Gantt load result:', {
+          backend: data?.backend,
+          tasksCount: Array.isArray(data?.tasks) ? data.tasks.length : null,
+          linksCount: Array.isArray(data?.links) ? data.links.length : null,
+        });
         const nextTasks = parseDates(data?.tasks);
         const nextLinks = Array.isArray(data?.links) ? data.links : [];
         setTasks(nextTasks.length ? nextTasks : defaultTasks);
         setLinks(nextLinks);
+        if (data?.backend) setSaveState((s) => ({ ...s, backend: data.backend }));
+      })
+      .catch((error) => {
+        console.error('Error loading Gantt data:', error);
+        setTasks(defaultTasks);
+        setLinks([]);
+      })
+      .finally(() => {
+        hydratedRef.current = true;
+      });
+
+    loadAssignees()
+      .then((a) => {
+        if (cancelled) return;
         setAssignees(Array.isArray(a) ? a : []);
+      })
+      .catch((error) => {
+        console.error('Error loading assignees:', error);
+        if (cancelled) return;
+        setAssignees([]);
+      });
+
+    loadCategories()
+      .then((c) => {
+        if (cancelled) return;
         setCategories(Array.isArray(c) ? c : []);
       })
       .catch((error) => {
-        console.error('Error loading data:', error);
-        // fallback to defaults - ensure app still renders
-        setTasks(defaultTasks);
-        setLinks([]);
-        setAssignees([]);
+        console.error('Error loading categories:', error);
+        if (cancelled) return;
         setCategories([]);
       });
 
@@ -175,6 +201,109 @@ export default function GanttEditor() {
       cancelled = true;
     };
   }, []);
+
+  // On reload, scroll timeline to the beginning of the current day (local midnight).
+  // We retry for a short window because the gantt can re-init scales/scroll during first layout passes.
+  useEffect(() => {
+    if (!api) return;
+    if (!hydratedRef.current) return;
+    if (didScrollToTodayRef.current) return;
+
+    let cancelled = false;
+    let tries = 0;
+    let stableFrames = 0;
+
+    const computeDesiredLeft = (sc, chartEl) => {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      // Use the scale's minUnit (e.g., 'day' or 'hour') for accurate pixel calculation
+      const unit = sc.minUnit || 'day';
+      const cellWidth = sc.lengthUnitWidth || 100;
+      
+      // Calculate difference in the scale's minUnit (e.g., days or hours)
+      // sc.diff(end, start, unit) returns the number of units between dates
+      const diffInUnits = sc.diff(today, sc.start, unit);
+      
+      // Convert units to pixels
+      // If minUnit is 'day', each day is cellWidth pixels
+      // If minUnit is 'hour', each hour is cellWidth pixels (when lengthUnit is 'hour')
+      let pxPerUnit = cellWidth;
+      if (unit === 'day' && sc.lengthUnit === 'day') {
+        pxPerUnit = cellWidth; // 1 day = cellWidth pixels
+      } else if (unit === 'hour' && sc.lengthUnit === 'hour') {
+        pxPerUnit = cellWidth; // 1 hour = cellWidth pixels
+      } else if (unit === 'hour' && sc.lengthUnit === 'day') {
+        pxPerUnit = cellWidth / 24; // 1 hour = cellWidth/24 pixels when lengthUnit is day
+      }
+      
+      let left = Math.round(diffInUnits * pxPerUnit);
+      const maxLeft = Math.max(0, (sc.width ?? 0) - (chartEl.clientWidth ?? 0));
+      if (left < 0) left = 0;
+      if (left > maxLeft) left = maxLeft;
+      return left;
+    };
+
+    const tick = () => {
+      if (cancelled) return;
+      tries += 1;
+
+      const state = api.getState?.();
+      const sc = state?._scales;
+      const chartEl = document.querySelector('.wx-chart');
+
+      if (!sc || !sc.start || typeof sc.diff !== 'function' || !chartEl) {
+        if (tries < 120) requestAnimationFrame(tick);
+        return;
+      }
+
+      // Recompute every frame because scales can re-init after data load / resize.
+      const desiredLeft = computeDesiredLeft(sc, chartEl);
+
+      const current = chartEl.scrollLeft ?? 0;
+      const delta = Math.abs(current - desiredLeft);
+
+      // Debug: log on first few attempts to diagnose issues
+      if (tries <= 5) {
+        console.log('🔍 Scroll to today:', {
+          tries,
+          today: new Date().toISOString().split('T')[0],
+          scaleStart: sc.start?.toISOString().split('T')[0],
+          scaleEnd: sc.end?.toISOString().split('T')[0],
+          minUnit: sc.minUnit,
+          lengthUnit: sc.lengthUnit,
+          lengthUnitWidth: sc.lengthUnitWidth,
+          width: sc.width,
+          chartWidth: chartEl.clientWidth,
+          desiredLeft,
+          current,
+          delta,
+        });
+      }
+
+      // If something reset scroll back to the start, keep re-applying until it sticks.
+      if (delta > 2) {
+        api.exec?.('scroll-chart', { left: desiredLeft });
+        chartEl.scrollLeft = desiredLeft;
+        stableFrames = 0;
+      } else {
+        stableFrames += 1;
+      }
+
+      // Require a few stable frames to avoid stopping too early while the chart is still initializing.
+      if (stableFrames >= 4) {
+        didScrollToTodayRef.current = true;
+        return;
+      }
+
+      if (tries < 120) requestAnimationFrame(tick);
+    };
+
+    requestAnimationFrame(tick);
+    return () => {
+      cancelled = true;
+    };
+  }, [api, tasks?.length]);
 
   // Inject CSS rules for category colors
   useEffect(() => {
@@ -301,10 +430,37 @@ export default function GanttEditor() {
       setApi(ganttApi);
 
       // Save data on changes
-      const saveData = () => {
+      const saveData = async () => {
+        // Prevent overwriting cloud/local data during initial mount/hydration.
+        // Some gantt events may fire during init/render even before load completes.
+        if (!hydratedRef.current) return;
+
         const currentTasks = ganttApi.serialize();
         const state = ganttApi.getState();
-        const currentLinks = state._links || [];
+        // IMPORTANT: Persist RAW links (source/target/type/id), not computed `_links` (which contains $p, $pl, etc).
+        // `state.links` is a DataArray (from gantt-store) and supports `.map(...)`.
+        let currentLinks = [];
+        try {
+          if (Array.isArray(state?.links)) {
+            currentLinks = state.links;
+          } else if (state?.links && typeof state.links.map === 'function') {
+            currentLinks = state.links.map((l) => l);
+          }
+        } catch {
+          currentLinks = [];
+        }
+        currentLinks = (Array.isArray(currentLinks) ? currentLinks : [])
+          .filter((l) => l && l.source !== undefined && l.target !== undefined)
+          .map((l) => {
+            const clean = {
+              id: l.id,
+              source: l.source,
+              target: l.target,
+              type: l.type,
+            };
+            if (l.lag !== undefined) clean.lag = l.lag;
+            return clean;
+          });
 
         const flattenAndPickTasks = (tree) => {
           const out = new Map();
@@ -352,22 +508,34 @@ export default function GanttEditor() {
           links: currentLinks,
         };
 
-        saveGanttData(dataToSave).catch((error) => {
+        setSaveState((s) => ({ ...s, status: 'saving' }));
+        try {
+          const result = await saveGanttData(dataToSave);
+          if (result?.ok) {
+            setSaveState({ status: 'saved', backend: result.backend || null, error: result?.error || null });
+          } else {
+            setSaveState({ status: 'error', backend: result?.backend || null, error: result?.error || null });
+          }
+        } catch (error) {
           console.error('Error saving Gantt data:', error);
-        });
+          setSaveState({ status: 'error', backend: null, error });
+        }
       };
 
       // Listen to all change events
-      ganttApi.on('update-task', saveData);
-      ganttApi.on('add-task', saveData);
-      ganttApi.on('delete-task', saveData);
-      ganttApi.on('add-link', saveData);
-      ganttApi.on('delete-link', saveData);
+      // fire-and-forget (handlers are sync)
+      ganttApi.on('update-task', () => void saveData());
+      ganttApi.on('add-task', () => void saveData());
+      ganttApi.on('delete-task', () => void saveData());
+      ganttApi.on('add-link', () => void saveData());
+      ganttApi.on('update-link', () => void saveData());
+      ganttApi.on('delete-link', () => void saveData());
     },
     []
   );
 
   // Custom columns with Jalali date formatting
+  // Hide 'start' and 'duration' columns by default
   const columns = useMemo(() => {
     try {
       // Use defaultColumns if available, otherwise let Gantt use its defaults
@@ -375,15 +543,17 @@ export default function GanttEditor() {
         console.warn('defaultColumns not available, using Gantt defaults');
         return undefined; // Let Gantt use defaultColumns internally
       }
-      return defaultColumns.map((col) => {
-        if (col && (col.id === 'start' || col.id === 'end')) {
-          return {
-            ...col,
-            template: (date) => formatJalaliDateColumn(date),
-          };
-        }
-        return col;
-      });
+      return defaultColumns
+        .filter((col) => col && col.id !== 'start' && col.id !== 'duration') // Hide start and duration columns
+        .map((col) => {
+          if (col && (col.id === 'start' || col.id === 'end')) {
+            return {
+              ...col,
+              template: (date) => formatJalaliDateColumn(date),
+            };
+          }
+          return col;
+        });
     } catch (error) {
       console.error('Error creating columns:', error);
       return undefined; // Fallback to defaults
@@ -529,8 +699,51 @@ export default function GanttEditor() {
         <div className="wx-gantt-editor-header-title">
           <img src="/logo.svg" alt="Logo" className="wx-gantt-editor-logo" />
           <h1>Shopping Redesign & Design System unified roadmap</h1>
+          <div
+            className={[
+              'wx-save-indicator',
+              saveState.status === 'saving' ? 'wx-save-indicator--saving' : '',
+              saveState.status === 'saved' ? 'wx-save-indicator--saved' : '',
+              saveState.status === 'error' ? 'wx-save-indicator--error' : '',
+            ]
+              .filter(Boolean)
+              .join(' ')}
+            title={
+              saveState.status === 'error'
+                ? 'Save failed (check console).'
+                : saveState.backend === 'supabase'
+                  ? 'Saved to Supabase Storage'
+                  : saveState.backend === 'local' && saveState.error
+                    ? 'Saved to localStorage (cloud save failed — check console; likely missing Storage write policy)'
+                    : saveState.backend === 'local'
+                      ? 'Saved to localStorage'
+                      : 'Save status'
+            }
+          >
+            {saveState.status === 'saving'
+              ? 'Saving…'
+              : saveState.status === 'error'
+                ? 'Save failed'
+                : saveState.backend === 'supabase'
+                  ? 'Saved (cloud)'
+                  : saveState.backend === 'local' && saveState.error
+                    ? 'Saved (local*)'
+                    : saveState.backend === 'local'
+                      ? 'Saved (local)'
+                    : '—'}
+          </div>
         </div>
         <div className="wx-gantt-editor-header-actions">
+          <Button
+            type="secondary"
+            icon="wxi-external-link"
+            css="wx-gantt-editor-settings-btn"
+            onClick={() => {
+              window.location.href = '/viewer';
+            }}
+          >
+            Viewer
+          </Button>
           <Button
             type="secondary"
             icon="wxi-settings"

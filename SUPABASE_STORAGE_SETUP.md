@@ -7,7 +7,13 @@ This project uses Supabase Storage to store the Gantt chart JSON file, not SQL t
 1. **Get your Supabase credentials** (already done):
    - Your `.env` file is already configured with:
      - `VITE_SUPABASE_URL=https://frmkcwwwaaygrqtcttqb.supabase.co`
-     - `VITE_SUPABASE_ANON_KEY=your-key`
+     - `VITE_SUPABASE_PUBLISHABLE_KEY=your-key`
+       - (Legacy) `VITE_SUPABASE_ANON_KEY=your-key`
+
+   If you don't have an `.env` yet, copy from `env.example`:
+   ```bash
+   cp env.example .env
+   ```
 
 2. **Create a Storage Bucket:**
    
