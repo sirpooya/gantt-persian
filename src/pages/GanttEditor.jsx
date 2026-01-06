@@ -17,7 +17,14 @@ import {
 import '../components/jalali-styles.css';
 import '../components/assignee/AssigneeUI.css';
 import './GanttEditor.css';
-import { loadAssignees, loadCategories, loadGanttData, saveGanttData } from '../lib/ganttService.js';
+import {
+  loadAssignees,
+  loadCategories,
+  loadGanttData,
+  saveAssignees,
+  saveCategories,
+  saveGanttData,
+} from '../lib/ganttService.js';
 
 // Base styles from SVAR UI packages
 import '@svar-ui/react-core/style.css';
@@ -93,6 +100,13 @@ export default function GanttEditor() {
   const [assignees, setAssignees] = useState([]);
   const [categories, setCategories] = useState([]);
   const [saveState, setSaveState] = useState({ status: 'idle', backend: null, error: null }); // idle|saving|saved|error
+
+  const [assigneesDraft, setAssigneesDraft] = useState([]);
+  const [categoriesDraft, setCategoriesDraft] = useState([]);
+  const [assigneesSaving, setAssigneesSaving] = useState(false);
+  const [categoriesSaving, setCategoriesSaving] = useState(false);
+  const [assigneesSaveMsg, setAssigneesSaveMsg] = useState('');
+  const [categoriesSaveMsg, setCategoriesSaveMsg] = useState('');
 
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsTab, setSettingsTab] = useState('assignee'); // assignee | category
@@ -178,23 +192,29 @@ export default function GanttEditor() {
     loadAssignees()
       .then((a) => {
         if (cancelled) return;
-        setAssignees(Array.isArray(a) ? a : []);
+        const next = Array.isArray(a) ? a : [];
+        setAssignees(next);
+        setAssigneesDraft(next);
       })
       .catch((error) => {
         console.error('Error loading assignees:', error);
         if (cancelled) return;
         setAssignees([]);
+        setAssigneesDraft([]);
       });
 
     loadCategories()
       .then((c) => {
         if (cancelled) return;
-        setCategories(Array.isArray(c) ? c : []);
+        const next = Array.isArray(c) ? c : [];
+        setCategories(next);
+        setCategoriesDraft(next);
       })
       .catch((error) => {
         console.error('Error loading categories:', error);
         if (cancelled) return;
         setCategories([]);
+        setCategoriesDraft([]);
       });
 
     return () => {
@@ -693,6 +713,14 @@ export default function GanttEditor() {
     };
   }, []);
 
+  const nextNumericId = useCallback((arr) => {
+    const max = (Array.isArray(arr) ? arr : [])
+      .map((x) => Number(x?.id))
+      .filter((n) => Number.isFinite(n))
+      .reduce((a, b) => Math.max(a, b), 0);
+    return String(max + 1);
+  }, []);
+
   return (
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
       <div className="wx-gantt-editor-header">
@@ -811,27 +839,167 @@ export default function GanttEditor() {
 
                   {settingsTab === 'assignee' ? (
                     <div className="wx-settings-list" role="list">
-                      {assignees.map((u) => (
-                        <div className="wx-settings-row" role="listitem" key={u.id}>
+                      <div className="wx-settings-actions">
+                        <Button
+                          type="secondary"
+                          onClick={() => {
+                            setAssigneesDraft((prev) => [
+                              ...(Array.isArray(prev) ? prev : []),
+                              { id: nextNumericId(prev), label: '', avatar: '' },
+                            ]);
+                          }}
+                        >
+                          Add assignee
+                        </Button>
+                        <Button
+                          type="primary"
+                          disabled={assigneesSaving}
+                          onClick={async () => {
+                            setAssigneesSaving(true);
+                            setAssigneesSaveMsg('');
+                            try {
+                              const res = await saveAssignees(assigneesDraft);
+                              if (res?.ok) {
+                                setAssignees(Array.isArray(assigneesDraft) ? assigneesDraft : []);
+                                setAssigneesSaveMsg('Saved to Supabase');
+                              } else {
+                                setAssigneesSaveMsg('Save failed (check console)');
+                              }
+                            } finally {
+                              setAssigneesSaving(false);
+                            }
+                          }}
+                        >
+                          {assigneesSaving ? 'Saving…' : 'Save to Supabase'}
+                        </Button>
+                        {assigneesSaveMsg ? <div className="wx-settings-save-msg">{assigneesSaveMsg}</div> : null}
+                      </div>
+
+                      {(Array.isArray(assigneesDraft) ? assigneesDraft : []).map((u, idx) => (
+                        <div className="wx-settings-row wx-settings-row-edit" role="listitem" key={u.id ?? idx}>
                           <AssigneeAvatar48 avatar={u.avatar} name={u.label} />
-                          <div className="wx-settings-row-name">{u.label}</div>
+                          <div className="wx-settings-fields">
+                            <div className="wx-settings-id">#{u.id}</div>
+                            <input
+                              className="wx-settings-input"
+                              value={u.label ?? ''}
+                              placeholder="Name"
+                              onChange={(e) => {
+                                const v = e.target.value;
+                                setAssigneesDraft((prev) =>
+                                  prev.map((x, i) => (i === idx ? { ...x, label: v } : x))
+                                );
+                              }}
+                            />
+                            <input
+                              className="wx-settings-input wx-settings-input--wide"
+                              value={u.avatar ?? ''}
+                              placeholder="Avatar URL (e.g. /data/avatars/Pooya.png)"
+                              onChange={(e) => {
+                                const v = e.target.value;
+                                setAssigneesDraft((prev) =>
+                                  prev.map((x, i) => (i === idx ? { ...x, avatar: v } : x))
+                                );
+                              }}
+                            />
+                          </div>
+                          <Button
+                            type="secondary"
+                            onClick={() => setAssigneesDraft((prev) => prev.filter((_, i) => i !== idx))}
+                          >
+                            Remove
+                          </Button>
                         </div>
                       ))}
                     </div>
                   ) : (
                     <div className="wx-settings-list" role="list">
-                      {categories.map((cat, idx) => (
-                        <div
-                          className="wx-settings-row"
-                          role="listitem"
-                          key={`${cat.name}-${idx}`}
+                      <div className="wx-settings-actions">
+                        <Button
+                          type="secondary"
+                          onClick={() => {
+                            setCategoriesDraft((prev) => [
+                              ...(Array.isArray(prev) ? prev : []),
+                              { id: nextNumericId(prev), name: '', color: '#808080' },
+                            ]);
+                          }}
                         >
+                          Add category
+                        </Button>
+                        <Button
+                          type="primary"
+                          disabled={categoriesSaving}
+                          onClick={async () => {
+                            setCategoriesSaving(true);
+                            setCategoriesSaveMsg('');
+                            try {
+                              const res = await saveCategories(categoriesDraft);
+                              if (res?.ok) {
+                                setCategories(Array.isArray(categoriesDraft) ? categoriesDraft : []);
+                                setCategoriesSaveMsg('Saved to Supabase');
+                              } else {
+                                setCategoriesSaveMsg('Save failed (check console)');
+                              }
+                            } finally {
+                              setCategoriesSaving(false);
+                            }
+                          }}
+                        >
+                          {categoriesSaving ? 'Saving…' : 'Save to Supabase'}
+                        </Button>
+                        {categoriesSaveMsg ? <div className="wx-settings-save-msg">{categoriesSaveMsg}</div> : null}
+                      </div>
+
+                      {(Array.isArray(categoriesDraft) ? categoriesDraft : []).map((cat, idx) => (
+                        <div className="wx-settings-row wx-settings-row-edit" role="listitem" key={cat.id ?? idx}>
                           <div
                             className="wx-settings-color24"
                             style={{ backgroundColor: cat.color || '#dfe2e6' }}
                             aria-label={cat.name || ''}
                           />
-                          <div className="wx-settings-row-name">{cat.name}</div>
+                          <div className="wx-settings-fields">
+                            <div className="wx-settings-id">#{cat.id}</div>
+                            <input
+                              className="wx-settings-input"
+                              value={cat.name ?? ''}
+                              placeholder="Name"
+                              onChange={(e) => {
+                                const v = e.target.value;
+                                setCategoriesDraft((prev) =>
+                                  prev.map((x, i) => (i === idx ? { ...x, name: v } : x))
+                                );
+                              }}
+                            />
+                            <input
+                              className="wx-settings-input wx-settings-input--color"
+                              type="color"
+                              value={cat.color || '#808080'}
+                              onChange={(e) => {
+                                const v = e.target.value;
+                                setCategoriesDraft((prev) =>
+                                  prev.map((x, i) => (i === idx ? { ...x, color: v } : x))
+                                );
+                              }}
+                              aria-label="Color"
+                            />
+                            <input
+                              className="wx-settings-input wx-settings-input--mono"
+                              value={cat.color ?? ''}
+                              placeholder="#RRGGBB"
+                              onChange={(e) => {
+                                const v = e.target.value;
+                                setCategoriesDraft((prev) =>
+                                  prev.map((x, i) => (i === idx ? { ...x, color: v } : x))
+                                );
+                              }}
+                            />
+                          </div>
+                          <Button
+                            type="secondary"
+                            onClick={() => setCategoriesDraft((prev) => prev.filter((_, i) => i !== idx))}
+                          >
+                            Remove
+                          </Button>
                         </div>
                       ))}
                     </div>

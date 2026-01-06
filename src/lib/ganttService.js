@@ -2,15 +2,42 @@ import { supabase, SUPABASE_URL, SUPABASE_HAS_KEY } from './supabase.js';
 
 const STORAGE_BUCKET = 'gantt-data';
 const JSON_FILE = 'gantt-data.json';
+const ASSIGNEE_FILE = 'assignee.json';
+const CATEGORY_FILE = 'category.json';
 const LOCAL_STORAGE_KEY = 'gantt-data::v1';
 
 // Public (unauthenticated) URLs for read-only JSON resources in Supabase Storage
+const PUBLIC_BUCKET_BASE =
+  'https://frmkcwwwaaygrqtcttqb.supabase.co/storage/v1/object/public/gantt-data';
 const PUBLIC_GANTT_URL =
-  'https://frmkcwwwaaygrqtcttqb.supabase.co/storage/v1/object/public/gantt-data/gantt-data.json';
+  `${PUBLIC_BUCKET_BASE}/gantt-data.json`;
 const PUBLIC_CATEGORY_URL =
-  'https://frmkcwwwaaygrqtcttqb.supabase.co/storage/v1/object/public/gantt-data/category.json';
+  `${PUBLIC_BUCKET_BASE}/category.json`;
 const PUBLIC_ASSIGNEE_URL =
-  'https://frmkcwwwaaygrqtcttqb.supabase.co/storage/v1/object/public/gantt-data/assignee.json';
+  `${PUBLIC_BUCKET_BASE}/assignee.json`;
+
+function resolveAssigneeAvatarUrl(avatar) {
+  if (!avatar) return '';
+  const s = String(avatar);
+  if (/^https?:\/\//i.test(s)) return s;
+
+  // Supabase storage public avatars live under `${PUBLIC_BUCKET_BASE}/avatars/*.png`
+  if (s.startsWith('/data/avatars/')) {
+    return `${PUBLIC_BUCKET_BASE}/avatars/${s.slice('/data/avatars/'.length)}`;
+  }
+  if (s.startsWith('data/avatars/')) {
+    return `${PUBLIC_BUCKET_BASE}/avatars/${s.slice('data/avatars/'.length)}`;
+  }
+  if (s.startsWith('/avatars/')) {
+    return `${PUBLIC_BUCKET_BASE}${s}`;
+  }
+  if (s.startsWith('avatars/')) {
+    return `${PUBLIC_BUCKET_BASE}/${s}`;
+  }
+
+  // If it's a site-relative path that's not the old dev path, keep it as-is.
+  return s;
+}
 
 function normalizeData(input) {
   return {
@@ -74,10 +101,88 @@ export async function loadCategories() {
 export async function loadAssignees() {
   try {
     const data = await fetchPublicJson(PUBLIC_ASSIGNEE_URL);
-    return Array.isArray(data) ? data : [];
+    const arr = Array.isArray(data) ? data : [];
+    return arr.map((a) => ({
+      ...a,
+      avatar: resolveAssigneeAvatarUrl(a?.avatar),
+    }));
   } catch (e) {
     console.error('Error loading assignees from public URL:', e);
     return [];
+  }
+}
+
+function normalizeAssignees(input) {
+  const arr = Array.isArray(input) ? input : [];
+  return arr
+    .filter(Boolean)
+    .map((a) => ({
+      id: a?.id !== undefined && a?.id !== null ? String(a.id) : '',
+      label: a?.label ?? '',
+      avatar: a?.avatar ?? '',
+    }))
+    .filter((a) => a.id);
+}
+
+function normalizeCategories(input) {
+  const arr = Array.isArray(input) ? input : [];
+  return arr
+    .filter(Boolean)
+    .map((c) => ({
+      id: c?.id !== undefined && c?.id !== null ? String(c.id) : '',
+      name: c?.name ?? '',
+      color: c?.color ?? '',
+    }))
+    .filter((c) => c.id);
+}
+
+export async function saveAssignees(assignees) {
+  if (!hasSupabaseConfig()) {
+    return {
+      ok: false,
+      backend: 'supabase',
+      error: new Error('Supabase key not configured (set VITE_SUPABASE_PUBLISHABLE_KEY)'),
+    };
+  }
+
+  try {
+    const normalized = normalizeAssignees(assignees);
+    const jsonString = JSON.stringify(normalized, null, 2);
+    const body = new Blob([jsonString], { type: 'application/json' });
+    const { error } = await supabase.storage.from(STORAGE_BUCKET).upload(ASSIGNEE_FILE, body, {
+      contentType: 'application/json',
+      upsert: true,
+    });
+    if (error) throw error;
+    return { ok: true, backend: 'supabase' };
+  } catch (error) {
+    console.error('Error saving assignees to Supabase Storage:', error);
+    return { ok: false, backend: 'supabase', error };
+  }
+}
+
+export async function saveCategories(categories) {
+  if (!hasSupabaseConfig()) {
+    return {
+      ok: false,
+      backend: 'supabase',
+      error: new Error('Supabase key not configured (set VITE_SUPABASE_PUBLISHABLE_KEY)'),
+    };
+  }
+
+  try {
+    const normalized = normalizeCategories(categories);
+    const jsonString = JSON.stringify(normalized, null, 2);
+    const body = new Blob([jsonString], { type: 'application/json' });
+    const { error } = await supabase.storage.from(STORAGE_BUCKET).upload(CATEGORY_FILE, body, {
+      contentType: 'application/json',
+      upsert: true,
+    });
+    if (error) throw error;
+    return { ok: true, backend: 'supabase' };
+  } catch (error) {
+    console.error('Error saving categories to Supabase Storage:', error);
+    return { ok: false, backend: 'supabase', error };
   }
 }
 

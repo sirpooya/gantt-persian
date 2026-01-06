@@ -1,4 +1,5 @@
-import { toJalaali } from 'jalaali-js';
+import { toJalaali, toGregorian, jalaaliMonthLength } from 'jalaali-js';
+import { registerScaleUnit } from '@svar-ui/gantt-store';
 
 // Persian month names
 export const persianMonths = [
@@ -19,6 +20,12 @@ export const persianMonths = [
 // Persian weekday first letters (Shanbeh..Jomeh)
 // شنبه، یکشنبه، دوشنبه، سه‌شنبه، چهارشنبه، پنجشنبه، جمعه
 export const persianDays = ['ش', 'ی', 'د', 'س', 'چ', 'پ', 'ج'];
+
+function toPersianDigits(input) {
+  const s = String(input ?? '');
+  const map = ['۰', '۱', '۲', '۳', '۴', '۵', '۶', '۷', '۸', '۹'];
+  return s.replace(/[0-9]/g, (d) => map[d.charCodeAt(0) - 48] || d);
+}
 
 /**
  * Map JS Date.getDay() (0=Sun..6=Sat) into Persian weekday index:
@@ -57,7 +64,12 @@ export function formatJalaliDate(date, format) {
   }
 
   if (format === '%j') {
-    return `${getPersianWeekdayLetter(g)} ${j.jd}`;
+    return `${getPersianWeekdayLetter(g)} ${toPersianDigits(j.jd)}`;
+  }
+
+  // Jalali day-of-month number only (01..31) as Persian digits (used for timescale day row)
+  if (format === '%J') {
+    return toPersianDigits(j.jd);
   }
 
   // Minimal token replacements (fallback)
@@ -65,7 +77,7 @@ export function formatJalaliDate(date, format) {
   return String(format)
     .replaceAll('%Y', String(j.jy))
     .replaceAll('%m', pad2(j.jm))
-    .replaceAll('%d', String(j.jd));
+    .replaceAll('%d', toPersianDigits(j.jd));
 }
 
 /**
@@ -76,20 +88,87 @@ export function formatJalaliDateColumn(date) {
   return formatJalaliDate(date, '%j');
 }
 
+let jalaliUnitsRegistered = false;
+function ensureJalaliUnitsRegistered() {
+  if (jalaliUnitsRegistered) return;
+  jalaliUnitsRegistered = true;
+
+  // A Jalali month unit that aligns boundaries to Persian months (not Gregorian months).
+  registerScaleUnit('jmonth', {
+    start: (date) => {
+      const d = date instanceof Date ? new Date(date) : new Date(date);
+      const j = toJalaali(d.getFullYear(), d.getMonth() + 1, d.getDate());
+      const g = toGregorian(j.jy, j.jm, 1);
+      return new Date(g.gy, g.gm - 1, g.gd, 0, 0, 0, 0);
+    },
+    end: (date) => {
+      const d = date instanceof Date ? new Date(date) : new Date(date);
+      const j = toJalaali(d.getFullYear(), d.getMonth() + 1, d.getDate());
+      const last = jalaaliMonthLength(j.jy, j.jm);
+      const g = toGregorian(j.jy, j.jm, last);
+      return new Date(g.gy, g.gm - 1, g.gd, 23, 59, 59, 999);
+    },
+    isSame: (a, b) => {
+      const d1 = a instanceof Date ? a : new Date(a);
+      const d2 = b instanceof Date ? b : new Date(b);
+      const j1 = toJalaali(d1.getFullYear(), d1.getMonth() + 1, d1.getDate());
+      const j2 = toJalaali(d2.getFullYear(), d2.getMonth() + 1, d2.getDate());
+      return j1.jy === j2.jy && j1.jm === j2.jm;
+    },
+    add: (date, num) => {
+      const d = date instanceof Date ? new Date(date) : new Date(date);
+      const j = toJalaali(d.getFullYear(), d.getMonth() + 1, d.getDate());
+      let jm = j.jm + num;
+      let jy = j.jy;
+      while (jm > 12) {
+        jm -= 12;
+        jy += 1;
+      }
+      while (jm < 1) {
+        jm += 12;
+        jy -= 1;
+      }
+      const g = toGregorian(jy, jm, 1);
+      return new Date(g.gy, g.gm - 1, g.gd, 0, 0, 0, 0);
+    },
+    diff: (a, b) => {
+      const d1 = a instanceof Date ? a : new Date(a);
+      const d2 = b instanceof Date ? b : new Date(b);
+      const j1 = toJalaali(d1.getFullYear(), d1.getMonth() + 1, d1.getDate());
+      const j2 = toJalaali(d2.getFullYear(), d2.getMonth() + 1, d2.getDate());
+      return (j1.jy - j2.jy) * 12 + (j1.jm - j2.jm);
+    },
+    smallerCount: {
+      day: (date) => {
+        const d = date instanceof Date ? new Date(date) : new Date(date);
+        const j = toJalaali(d.getFullYear(), d.getMonth() + 1, d.getDate());
+        return jalaaliMonthLength(j.jy, j.jm);
+      },
+      hour: (date) => {
+        const d = date instanceof Date ? new Date(date) : new Date(date);
+        const j = toJalaali(d.getFullYear(), d.getMonth() + 1, d.getDate());
+        return jalaaliMonthLength(j.jy, j.jm) * 24;
+      },
+    },
+  });
+}
+
 /**
  * Create Jalali scales (month row + day row).
  * This matches the Gantt `scales` prop shape.
  */
 export function createJalaliScales() {
+  ensureJalaliUnitsRegistered();
   return [
     {
-      unit: 'month',
+      unit: 'jmonth',
       step: 1,
       format: (date) => formatJalaliDate(date, '%F %Y'),
     },
     {
       unit: 'day',
       step: 1,
+      // Weekday first letter + day-of-month (e.g. "پ ۳") under the Persian month header
       format: (date) => formatJalaliDate(date, '%j'),
     },
   ];
